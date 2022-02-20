@@ -19,6 +19,7 @@ pub fn get_input(day: u8) -> String {
 }
 
 fn download_input(day: u8, path: &str) -> String {
+    println!("Downloading input for day {} to {}...", day, path);
     let url = format!("https://adventofcode.com/2021/day/{}/input", day);
     let session = format!("session={}", get_session());
     let input = Command::new("curl")
