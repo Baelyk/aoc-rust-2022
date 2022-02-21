@@ -43,12 +43,6 @@ impl BitString {
     fn usize(self) -> usize {
         usize::from(self)
     }
-
-    fn complement(self) -> Self {
-        let mut complement = self;
-        complement.bits.iter_mut().for_each(|bit| *bit = !*bit);
-        complement
-    }
 }
 
 #[derive(Debug)]
@@ -154,8 +148,36 @@ fn part_1(input: &Vec<BitString>) -> usize {
     return gamma * epsilon;
 }
 
+fn most_common_nth_digit(input: &Vec<BitString>, n: usize) -> bool {
+    let all = input.len();
+    let mut ones = 0;
+    input.iter().for_each(|bits| {
+        if bits[n] {
+            ones += 1;
+        }
+    });
+    // Prefer ones
+    return ones >= all - ones;
+}
+
+fn get_diagnostic_rating(input: &Vec<BitString>, most: bool) -> BitString {
+    (0..12).rev().fold(input.clone(), |acc, n| {
+        if acc.len() == 1 {
+            return acc;
+        } else if acc.len() <= 12 && n < 5 {
+        }
+        let digit = most_common_nth_digit(&acc, n);
+        acc.iter()
+            .filter(|bits| if bits[n] == digit { most } else { !most })
+            .map(|bits| *bits)
+            .collect()
+    })[0]
+}
+
 fn part_2(input: &Vec<BitString>) -> usize {
-    unimplemented!()
+    let o2 = get_diagnostic_rating(input, true);
+    let co2 = get_diagnostic_rating(input, false);
+    o2.usize() * co2.usize()
 }
 
 #[cfg(test)]
@@ -218,12 +240,31 @@ mod day_3_tests {
             "00100\n11110\n10110\n10111\n10101\n01111\n00111\n11100\n10000\n11001\n00010\n01010",
         );
         let parsed = parse_input(input);
-        assert_eq!(part_2(&parsed), 900);
+
+        // The shorter bit strings rear their ugly head here again, manually change to len 5
+        fn get_diagnostic_rating(input: &Vec<BitString>, most: bool) -> BitString {
+            (0..5).rev().fold(input.clone(), |acc, n| {
+                if acc.len() == 1 {
+                    return acc;
+                } else if acc.len() <= 12 && n < 5 {
+                }
+                let digit = most_common_nth_digit(&acc, n);
+                acc.iter()
+                    .filter(|bits| if bits[n] == digit { most } else { !most })
+                    .map(|bits| *bits)
+                    .collect()
+            })[0]
+        }
+
+        let o2 = get_diagnostic_rating(&parsed, true);
+        let co2 = get_diagnostic_rating(&parsed, false);
+
+        assert_eq!(o2.usize() * co2.usize(), 230);
     }
     #[test]
     fn solution_part_2() {
         let input = get_input(3);
         let parsed = parse_input(input);
-        assert_eq!(part_2(&parsed), 1488311643);
+        assert_eq!(part_2(&parsed), 1353024);
     }
 }
