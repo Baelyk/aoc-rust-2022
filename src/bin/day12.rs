@@ -79,12 +79,17 @@ impl Graph {
             .iter()
             .map(|neighbor| {
                 let mut double = double;
-                let mut visited = visited.clone();
-                if is_small(neighbor) && !visited.insert(neighbor) {
-                    if !double {
-                        return 0;
+                if is_small(neighbor) {
+                    if visited.contains(neighbor) {
+                        if double {
+                            double = false;
+                        } else {
+                            return 0;
+                        }
                     } else {
-                        double = false;
+                        let mut visited = visited.clone();
+                        visited.insert(neighbor);
+                        return self.find_all_paths(&neighbor, goal, &visited, double);
                     }
                 }
                 self.find_all_paths(&neighbor, goal, &visited, double)
