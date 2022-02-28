@@ -1,6 +1,7 @@
 use aoc::*;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::collections::VecDeque;
 use std::error::Error;
 use std::str::FromStr;
 
@@ -19,6 +20,10 @@ fn main() {
 
 fn is_small(cave: &String) -> bool {
     cave != "start" && cave != "end" && cave.chars().next().unwrap().is_ascii_lowercase()
+}
+
+fn times_visited(path: &Vec<&String>, cave: &String) -> usize {
+    path.iter().filter(|&step| *step == cave).count()
 }
 
 struct Graph {
@@ -52,46 +57,39 @@ impl Graph {
         self.matrix.get(node).unwrap()
     }
 
-    fn find_all_routes(&self, max_visits: usize) -> usize {
-        self.find_path_to_end(
-            max_visits,
-            &HashMap::new(),
-            &String::from("start"),
-            &String::new(),
-        )
+    fn find_all_routes(&self, double: bool) -> usize {
+        let start = String::from("start");
+        let end = String::from("end");
+        self.find_all_paths(&start, &end, &HashSet::new(), double)
     }
 
-    fn find_path_to_end(
+    fn find_all_paths(
         &self,
-        max_visits: usize,
-        visited: &HashMap<&String, usize>,
         start: &String,
-        path: &String,
+        goal: &String,
+        visited: &HashSet<&String>,
+        double: bool,
     ) -> usize {
-        if start == "end" {
+        if start == goal {
             return 1;
         }
 
-        return self
-            .neighbors(start)
+        let neighbors = self.neighbors(start);
+        neighbors
             .iter()
-            .filter(|neighbor| *neighbor != "start")
             .map(|neighbor| {
+                let mut double = double;
                 let mut visited = visited.clone();
-                let visit_count = visited.entry(neighbor).or_insert(0);
-                *visit_count += 1;
-                if !is_small(neighbor) || *visit_count <= max_visits {
-                    self.find_path_to_end(
-                        max_visits,
-                        &visited,
-                        neighbor,
-                        &format!("{} {}", path, neighbor),
-                    )
-                } else {
-                    0
+                if is_small(neighbor) && !visited.insert(neighbor) {
+                    if !double {
+                        return 0;
+                    } else {
+                        double = false;
+                    }
                 }
+                self.find_all_paths(&neighbor, goal, &visited, double)
             })
-            .sum();
+            .sum()
     }
 }
 
@@ -100,8 +98,20 @@ impl FromStr for Graph {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut graph = Graph::new();
         s.lines().for_each(|line| {
-            let parts: Vec<String> = line.split('-').map(|part| part.to_string()).collect();
-            graph.add_edge(&parts[0], &parts[1], &parts[0] != "start");
+            let mut parts: Vec<String> = line.split('-').map(|part| part.to_string()).collect();
+            // Start only has from edges, end only has to edges
+            if &parts[1] == "start" {
+                parts[1] = parts[0].clone();
+                parts[0] = String::from("start");
+            } else if &parts[0] == "end" {
+                parts[0] = parts[1].clone();
+                parts[1] = String::from("end");
+            }
+            graph.add_edge(
+                &parts[0],
+                &parts[1],
+                &parts[0] != "start" && &parts[1] != "end",
+            );
         });
         Ok(graph)
     }
@@ -112,11 +122,11 @@ fn parse_input(input: String) -> Graph {
 }
 
 fn part_1(input: &Graph) -> usize {
-    input.find_all_routes(1)
+    input.find_all_routes(false)
 }
 
 fn part_2(input: &Graph) -> usize {
-    input.find_all_routes(2)
+    input.find_all_routes(true)
 }
 
 #[cfg(test)]
@@ -206,7 +216,7 @@ b-end",
     fn test_part_2() {
         let input = String::from(TEST_INPUT);
         let parsed = parse_input(input);
-        assert_eq!(part_2(&parsed), 0);
+        assert_eq!(part_2(&parsed), 3509);
     }
     #[test]
     fn solution_part_2() {
