@@ -227,6 +227,6 @@ b-end",
     fn solution_part_2() {
         let input = get_input(DAY);
         let parsed = parse_input(input);
-        assert_eq!(part_2(&parsed), 0);
+        assert_eq!(part_2(&parsed), 105453);
     }
 }
