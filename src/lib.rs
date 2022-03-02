@@ -3,6 +3,8 @@ use std::io::prelude::*;
 use std::io::Write;
 use std::process::Command;
 
+pub mod grid;
+
 pub fn hello() {
     println!("Hello, world! - lib");
 }
