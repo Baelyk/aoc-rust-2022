@@ -45,10 +45,10 @@ impl PartialOrd for NodeCost {
 fn pathfind(grid: &Grid) -> usize {
     let start = grid.first();
     let end = grid.last();
-    let mut queue = BinaryHeap::new();
-    let mut visited = HashSet::new();
-    let mut distances = HashMap::new();
-    let mut previous = HashMap::new();
+    let mut queue = BinaryHeap::with_capacity(grid.size());
+    let mut visited = HashSet::with_capacity(grid.size());
+    let mut distances = HashMap::with_capacity(grid.size());
+    let mut previous = HashMap::with_capacity(grid.size());
 
     queue.push(NodeCost::new(start, 0));
 
@@ -166,6 +166,6 @@ mod day_15_tests {
     fn solution_part_2() {
         let input = get_input(DAY);
         let parsed = parse_input(input);
-        assert_eq!(part_2(&parsed), 0);
+        assert_eq!(part_2(&parsed), 2864);
     }
 }
