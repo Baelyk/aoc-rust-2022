@@ -3,6 +3,7 @@ use std::io::prelude::*;
 use std::io::Write;
 use std::process::Command;
 
+pub mod bits;
 pub mod grid;
 
 pub fn hello() {
