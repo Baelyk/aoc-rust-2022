@@ -4,14 +4,16 @@ use std::ops::{Index, IndexMut};
 use std::slice::IterMut;
 use std::str::FromStr;
 
+pub type UsizeGrid = Grid<usize>;
+
 #[derive(Clone)]
-pub struct Grid {
-    elements: Vec<usize>,
+pub struct Grid<T> {
+    elements: Vec<T>,
     width: usize,
 }
 
-impl Grid {
-    pub fn new(elements: Vec<usize>, width: usize) -> Grid {
+impl<T> Grid<T> {
+    pub fn new(elements: Vec<T>, width: usize) -> Grid<T> {
         Grid { elements, width }
     }
 
@@ -92,26 +94,39 @@ impl Grid {
         neighbors
     }
 
-    pub fn get_index(&self, index: usize) -> usize {
+    pub fn get_index(&self, index: usize) -> T
+    where
+        T: Copy,
+    {
         self.elements[index]
     }
 
-    pub fn get_coord(&self, x: usize, y: usize) -> usize {
+    pub fn get_coord(&self, x: usize, y: usize) -> T
+    where
+        T: Copy,
+    {
         let width = self.width();
         self.elements[x + width * y]
     }
 
-    pub fn get_mut_coord(&mut self, x: usize, y: usize) -> &mut usize {
+    pub fn get_mut_coord(&mut self, x: usize, y: usize) -> &mut T {
         let width = self.width();
         &mut self.elements[x + width * y]
     }
 
-    pub fn iter_mut(&mut self) -> IterMut<'_, usize> {
+    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
         self.elements.iter_mut()
+    }
+
+    pub fn elements(&self) -> &Vec<T> {
+        &self.elements
     }
 }
 
-impl FromStr for Grid {
+impl<T: FromStr + fmt::Debug> FromStr for Grid<T>
+where
+    <T as FromStr>::Err: fmt::Debug,
+{
     type Err = Box<dyn Error>;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(Grid {
@@ -119,15 +134,15 @@ impl FromStr for Grid {
                 .replace("\n", "")
                 .split("")
                 .filter(|s| !s.is_empty())
-                .map(|s| s.parse::<usize>().unwrap())
+                .map(|s| s.parse::<T>().unwrap())
                 .collect(),
             width: s.lines().next().unwrap().len(),
         })
     }
 }
 
-impl Index<usize> for Grid {
-    type Output = [usize];
+impl<T> Index<usize> for Grid<T> {
+    type Output = [T];
 
     fn index(&self, y: usize) -> &Self::Output {
         let width = self.width();
@@ -137,7 +152,7 @@ impl Index<usize> for Grid {
     }
 }
 
-impl IndexMut<usize> for Grid {
+impl<T> IndexMut<usize> for Grid<T> {
     fn index_mut(&mut self, y: usize) -> &mut Self::Output {
         let width = self.width();
         let row = y % width;
@@ -146,9 +161,8 @@ impl IndexMut<usize> for Grid {
     }
 }
 
-impl fmt::Display for Grid {
+impl<T: Copy + fmt::Display> fmt::Display for Grid<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        println!("{:?}", self.elements);
         write!(
             f,
             "{}",

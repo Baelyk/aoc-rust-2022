@@ -1,4 +1,4 @@
-use aoc::grid::Grid;
+use aoc::grid::UsizeGrid as Grid;
 use aoc::*;
 use std::cmp::{Ordering, Reverse};
 use std::collections::BinaryHeap;
