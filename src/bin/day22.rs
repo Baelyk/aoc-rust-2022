@@ -1,8 +1,7 @@
 use aoc::*;
-use std::cmp::Ordering;
+use std::cmp::{max, min};
 use std::error::Error;
 use std::fmt;
-use std::ops::{Add, Index, IndexMut, Mul, Range, Sub};
 use std::str::FromStr;
 
 const DAY: u8 = 22;
@@ -19,6 +18,13 @@ fn main() {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum Axis {
+    X,
+    Y,
+    Z,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 struct Point {
     x: isize,
     y: isize,
@@ -30,30 +36,46 @@ impl Point {
         Self { x, y, z }
     }
 
-    fn compare(&self, other: &Self) -> (Ordering, Ordering, Ordering) {
-        (
-            self.x.cmp(&other.x),
-            self.y.cmp(&other.y),
-            self.z.cmp(&other.z),
-        )
+    fn change_coord(&self, axis: Axis, coord: isize) -> Point {
+        match axis {
+            Axis::X => Point::new(coord, self.y, self.z),
+            Axis::Y => Point::new(self.x, coord, self.z),
+            Axis::Z => Point::new(self.x, self.y, coord),
+        }
     }
-}
 
-impl PartialOrd for Point {
-    // Can be ordered if all components are e.g. <, so (1, 1, 1) cannot be
-    // compared with (0, 1, 2)
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        if self.x < other.x && self.y < other.y && self.z < other.z {
-            Some(Ordering::Less)
-        } else if self == other {
-            Some(Ordering::Equal)
-        } else if self.x > other.x && self.y > other.y && self.z > other.z {
-            Some(Ordering::Greater)
-        } else {
-            None
+    fn min(a: &Point, b: &Point) -> Point {
+        Point {
+            x: min(a.x, b.x),
+            y: min(a.y, b.y),
+            z: min(a.z, b.z),
+        }
+    }
+
+    fn max(a: &Point, b: &Point) -> Point {
+        Point {
+            x: max(a.x, b.x),
+            y: max(a.y, b.y),
+            z: max(a.z, b.z),
         }
     }
 }
+
+//impl PartialOrd for Point {
+//// Can be ordered if all components are e.g. <, so (1, 1, 1) cannot be
+//// compared with (0, 1, 2)
+//fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+//if self.x < other.x && self.y < other.y && self.z < other.z {
+//Some(Ordering::Less)
+//} else if self == other {
+//Some(Ordering::Equal)
+//} else if self.x > other.x && self.y > other.y && self.z > other.z {
+//Some(Ordering::Greater)
+//} else {
+//None
+//}
+//}
+//}
 
 impl fmt::Display for Point {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -82,36 +104,133 @@ impl Cuboid {
     }
 
     fn contains(&self, other: &Self) -> bool {
-        self.min <= other.min && self.max >= other.max
+        self.intersection(other) == *other
+    }
+
+    fn intersection(&self, other: &Self) -> Self {
+        Cuboid {
+            min: Point::max(&self.min, &other.min),
+            max: Point::min(&self.max, &other.max),
+        }
     }
 
     fn intersects(&self, other: &Self) -> bool {
-        self.min <= other.max && self.max >= other.min
+        self.intersection(other).size() > 0
     }
 
-    /// Split the intersection of self and other off and of either. The first
-    /// component is the remnants of self, and the second is the intersection
-    /// and the remnants of other.
-    fn split_off_intersection(&self, other: &Self) -> (Vec<Cuboid>, Vec<Cuboid>) {}
+    fn size(&self) -> usize {
+        if self.min.x > self.max.x || self.min.y > self.max.y || self.min.z > self.max.z {
+            0
+        } else {
+            let size = (1 + self.max.x - self.min.x)
+                * (1 + self.max.y - self.min.y)
+                * (1 + self.max.z - self.min.z);
+            size.try_into().unwrap()
+        }
+    }
+
+    /// Split this cuboid in two along the plane at `plane` in the `axis`-axis,
+    /// e.g. axis = Axis::X and plane = 1 splits along the x = 1 plane. The second component
+    /// contains the plane.
+    fn split_below(&self, axis: Axis, plane: isize) -> (Cuboid, Cuboid) {
+        (
+            Cuboid {
+                min: self.min,
+                max: self.max.change_coord(axis, plane - 1),
+            },
+            Cuboid {
+                min: self.min.change_coord(axis, plane),
+                max: self.max,
+            },
+        )
+    }
+    fn split_above(&self, axis: Axis, plane: isize) -> (Cuboid, Cuboid) {
+        (
+            Cuboid {
+                min: self.min.change_coord(axis, plane + 1),
+                max: self.max,
+            },
+            Cuboid {
+                min: self.min,
+                max: self.max.change_coord(axis, plane),
+            },
+        )
+    }
+
+    fn breakup(&self, hole: &Cuboid) -> Vec<Cuboid> {
+        let mut parts = vec![];
+
+        let (split_off, remnants) = self.split_below(Axis::X, hole.min.x);
+        parts.push(split_off);
+        let (split_off, remnants) = remnants.split_above(Axis::X, hole.max.x);
+        parts.push(split_off);
+
+        let (split_off, remnants) = remnants.split_below(Axis::Y, hole.min.y);
+        parts.push(split_off);
+        let (split_off, remnants) = remnants.split_above(Axis::Y, hole.max.y);
+        parts.push(split_off);
+
+        let (split_off, remnants) = remnants.split_below(Axis::Z, hole.min.z);
+        parts.push(split_off);
+        let (split_off, _) = remnants.split_above(Axis::Z, hole.max.z);
+        parts.push(split_off);
+
+        //parts.iter().for_each(|part| println!("{}", part));
+
+        parts.into_iter().filter(|part| part.size() > 0).collect()
+    }
+
+    /// Split off the intersection of self and other, in the process breaking up what remains of
+    /// each into at most 6 cuboids each. Returns (selfs, others, cuboids).
+    fn split_off_intersection(&self, other: &Self) -> (Vec<Cuboid>, Vec<Cuboid>, Cuboid) {
+        // In order to assume that self.min <= other.min, switch self and other if self.min >
+        // other.min:
+        //if self.min > other.min {
+        //let (others, selfs, intersection) = other.split_off_intersection(self);
+        //return (selfs, others, intersection);
+        //}
+
+        let intersection = self.intersection(other);
+        let selfs = self.breakup(&intersection);
+        let others = other.breakup(&intersection);
+
+        //selfs.iter().for_each(|p| println!("{}", p));
+        //println!("others:");
+        //others.iter().for_each(|p| println!("{}", p));
+
+        (selfs, others, intersection)
+    }
 }
 
+impl fmt::Display for Cuboid {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "x={}..{},y={}..{},z={}..{}",
+            self.min.x, self.max.x, self.min.y, self.max.y, self.min.z, self.max.z
+        )
+    }
+}
+
+#[derive(Clone)]
 struct RebootStep {
     cuboid: Cuboid,
     state: bool,
+}
+
+impl RebootStep {
+    fn new(cuboid: Cuboid, state: bool) -> Self {
+        Self { cuboid, state }
+    }
 }
 
 impl fmt::Display for RebootStep {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{} x={}..{},y={}..{},z={}..{})",
+            "{} {}",
             if self.state { "on" } else { "off" },
-            self.cuboid.min.x,
-            self.cuboid.max.x,
-            self.cuboid.min.y,
-            self.cuboid.max.y,
-            self.cuboid.min.z,
-            self.cuboid.max.z
+            self.cuboid
         )
     }
 }
@@ -162,16 +281,81 @@ impl FromStr for RebootStep {
     }
 }
 
+fn process_steps(steps: &Vec<RebootStep>) -> usize {
+    let mut on_cuboids: Vec<Cuboid> = vec![];
+    let mut steps = steps.clone();
+
+    while !steps.is_empty() {
+        let step = steps.pop().unwrap();
+        //println!("\nStep {}", step);
+
+        let cuboid = on_cuboids
+            .iter()
+            .enumerate()
+            .find(|(_, cuboid)| cuboid.intersects(&step.cuboid));
+
+        if let Some((i, cuboid)) = cuboid {
+            //println!("{} intersects \n {}", step, cuboid);
+            let (step_parts, mut cuboid_parts, intersection) =
+                step.cuboid.split_off_intersection(&cuboid);
+
+            // Turn the remaining parts of this step into more steps
+            steps.append(
+                &mut step_parts
+                    .into_iter()
+                    .map(|part| RebootStep::new(part, step.state))
+                    .collect(),
+            );
+
+            // Add back the nonintersection parts of the on cuboid
+            on_cuboids.remove(i);
+            on_cuboids.append(&mut cuboid_parts);
+
+            // Add back the intersection if this step turns things on
+            if step.state {
+                on_cuboids.push(intersection);
+            }
+        } else if step.state {
+            on_cuboids.push(step.cuboid);
+        } else {
+            //println!("Step {} does not intersect any of", step);
+            //on_cuboids
+            //.iter()
+            //.for_each(|cuboid| println!("  {}", cuboid));
+        }
+
+        //println!(
+        //"After {}, {} cubes are on, {} steps remaining",
+        //step,
+        //on_cuboids.iter().map(|cuboid| cuboid.size()).sum::<usize>(),
+        //steps.len()
+        //);
+    }
+    on_cuboids.iter().map(|cuboid| cuboid.size()).sum()
+}
+
 fn parse_input(input: String) -> Vec<RebootStep> {
     input.lines().map(|l| l.parse().unwrap()).collect()
 }
 
 fn part_1(input: &Vec<RebootStep>) -> usize {
-    unimplemented!()
+    let init_cuboid = Cuboid::new(-50, -50, -50, 50, 50, 50);
+    //let mut on_cuboids = vec![];
+
+    let steps: Vec<RebootStep> = input
+        .iter()
+        .filter(|step| init_cuboid.contains(&step.cuboid))
+        .rev()
+        .cloned()
+        .collect();
+
+    process_steps(&steps)
 }
 
 fn part_2(input: &Vec<RebootStep>) -> usize {
-    unimplemented!()
+    let steps = input.clone();
+
+    process_steps(&steps)
 }
 
 #[cfg(test)]
@@ -220,7 +404,37 @@ on x=967..23432,y=45373..81175,z=27513..53682";
         assert!(!Cuboid::new(7, 7, 7, 8, 8, 8).intersects(&Cuboid::new(0, 0, 0, 5, 5, 5)));
         assert!(!Cuboid::new(0, 0, 0, 5, 5, 5).intersects(&Cuboid::new(6, 5, 6, 8, 8, 8)));
     }
+    #[test]
+    fn test_split_off_intersection() {
+        let a = "on x=-49..-5,y=-3..45,z=-29..18"
+            .parse::<RebootStep>()
+            .unwrap()
+            .cuboid;
+        let b = "on x=-41..9,y=-7..43,z=-33..15"
+            .parse::<RebootStep>()
+            .unwrap()
+            .cuboid;
+        //println!("{}", a);
+        //println!("{}", b);
+        assert_eq!(a.split_off_intersection(&b).0.len(), 3)
+    }
+    #[test]
+    fn test_cuboid_size() {
+        assert_eq!(Cuboid::new(0, 0, 0, 5, 5, 5).size(), 5 * 5 * 5);
+        assert_eq!(Cuboid::new(6, 6, 6, 5, 5, 5).size(), 0);
+    }
 
+    #[test]
+    fn test_part_1_smol() {
+        let input = String::from(
+            "on x=10..12,y=10..12,z=10..12
+on x=11..13,y=11..13,z=11..13
+off x=9..11,y=9..11,z=9..11
+on x=10..10,y=10..10,z=10..10",
+        );
+        let parsed = parse_input(input);
+        assert_eq!(part_1(&parsed), 39);
+    }
     #[test]
     fn test_part_1() {
         let input = String::from(TEST_INPUT);
@@ -231,7 +445,7 @@ on x=967..23432,y=45373..81175,z=27513..53682";
     fn solution_part_1() {
         let input = get_input(DAY);
         let parsed = parse_input(input);
-        assert_eq!(part_1(&parsed), 0);
+        assert_eq!(part_1(&parsed), 537042);
     }
     #[test]
     fn test_part_2() {
